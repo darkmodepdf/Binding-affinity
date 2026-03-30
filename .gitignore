@@ -50,3 +50,6 @@ models/**/vanilla_model_weights/
 *.log
 tmp/
 temp/
+
+# Local documentation notes
+PROJECT_DETAILED_SUMMARY.md

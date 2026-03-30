@@ -24,7 +24,22 @@ import joblib
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    balanced_accuracy_score,
+    confusion_matrix,
+    explained_variance_score,
+    f1_score,
+    matthews_corrcoef,
+    mean_absolute_error,
+    mean_squared_error,
+    median_absolute_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
@@ -353,13 +368,63 @@ def load_bundle(path: Path) -> Tuple[EmbeddingBundle, np.ndarray]:
     return b, y
 
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+def _safe_metric(fn, *args, default=np.nan, **kwargs):
+    try:
+        return float(fn(*args, **kwargs))
+    except Exception:
+        return float(default)
+
+
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray, cls_threshold: float) -> dict:
     rho = spearmanr(y_true, y_pred).correlation
+    pearson = np.corrcoef(y_true, y_pred)[0, 1] if len(y_true) > 1 else np.nan
+
+    # Classification-style view over continuous regression outputs.
+    y_true_bin = (y_true >= cls_threshold).astype(np.int32)
+    y_pred_bin = (y_pred >= cls_threshold).astype(np.int32)
+
+    tn = fp = fn = tp = 0
+    cm = confusion_matrix(y_true_bin, y_pred_bin, labels=[0, 1])
+    if cm.shape == (2, 2):
+        tn, fp, fn, tp = cm.ravel()
+
+    specificity = _safe_metric(lambda tnn, fpp: tnn / (tnn + fpp), tn, fp)
+    sensitivity = _safe_metric(lambda tpp, fnn: tpp / (tpp + fnn), tp, fn)
+
     return {
-        "mae": float(mean_absolute_error(y_true, y_pred)),
-        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
-        "r2": float(r2_score(y_true, y_pred)),
-        "spearman": float(0.0 if np.isnan(rho) else rho),
+        "regression": {
+            "mae": float(mean_absolute_error(y_true, y_pred)),
+            "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
+            "r2": float(r2_score(y_true, y_pred)),
+            "spearman": float(0.0 if np.isnan(rho) else rho),
+            "pearson": float(0.0 if np.isnan(pearson) else pearson),
+            "explained_variance": float(explained_variance_score(y_true, y_pred)),
+            "median_absolute_error": float(median_absolute_error(y_true, y_pred)),
+        },
+        "classification_like": {
+            "threshold": float(cls_threshold),
+            "roc_auc": _safe_metric(roc_auc_score, y_true_bin, y_pred),
+            "aoc": _safe_metric(roc_auc_score, y_true_bin, y_pred),
+            "pr_auc": _safe_metric(average_precision_score, y_true_bin, y_pred),
+            "accuracy": _safe_metric(accuracy_score, y_true_bin, y_pred_bin),
+            "precision": _safe_metric(precision_score, y_true_bin, y_pred_bin, zero_division=0),
+            "recall": _safe_metric(recall_score, y_true_bin, y_pred_bin, zero_division=0),
+            "f1": _safe_metric(f1_score, y_true_bin, y_pred_bin, zero_division=0),
+            "balanced_accuracy": _safe_metric(balanced_accuracy_score, y_true_bin, y_pred_bin),
+            "mcc": _safe_metric(matthews_corrcoef, y_true_bin, y_pred_bin),
+            "specificity": specificity,
+            "sensitivity": sensitivity,
+            "confusion_matrix": {
+                "tn": int(tn),
+                "fp": int(fp),
+                "fn": int(fn),
+                "tp": int(tp),
+            },
+            "support": {
+                "n_neg": int((y_true_bin == 0).sum()),
+                "n_pos": int((y_true_bin == 1).sum()),
+            },
+        },
     }
 
 
@@ -700,8 +765,9 @@ def main() -> None:
         joblib.dump(model, args.output_dir / "mlp_model.joblib")
         used_device = "cpu"
 
-    val_metrics = evaluate(y_val, val_pred)
-    test_metrics = evaluate(y_test, test_pred)
+    cls_threshold = float(np.median(y_train))
+    val_metrics = evaluate(y_val, val_pred, cls_threshold)
+    test_metrics = evaluate(y_test, test_pred, cls_threshold)
 
     metrics = {
         "n_train": int(len(train_df)),

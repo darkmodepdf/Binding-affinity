@@ -17,10 +17,10 @@ dependencies:
   - pytorch>=2.1
   - pytorch-cuda=12.1
   - pip:
-      - transformers>=4.40
-      - tokenizers
+      - transformers==4.57.1
+      - tokenizers==0.21.2
       - safetensors
-      - huggingface-hub
+      - huggingface-hub<1.0
       - sentencepiece
       - biopython
       - delta-spark<4.0
