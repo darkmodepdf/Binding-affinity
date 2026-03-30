@@ -1,0 +1,29 @@
+# Python env/cache
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+
+# Large raw/processed datasets
+asd/
+csv/asd_full.csv
+csv/asd_regression_ready_hla.csv
+
+# Model outputs/artifacts
+csv/model_artifacts*/
+csv/*_split.csv
+csv/*metrics*.json
+*.joblib
+
+# Optional temp/log files
+*.log
+tmp/
+temp/

@@ -1,0 +1,18 @@
+joblib
+numpy
+pandas
+pyarrow
+scipy
+scikit-learn
+torch
+transformers
+
+# Dataset + Spark tooling used in this project
+delta-spark<4.0
+findspark
+gdown
+json2schema
+oauth2client
+py4j
+pydrive2
+pyspark<4.0
