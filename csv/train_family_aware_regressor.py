@@ -46,6 +46,16 @@ from sklearn.preprocessing import StandardScaler
 from tqdm.auto import tqdm
 
 NUM_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+PROGRESS_ENABLED = True
+
+
+def set_progress_enabled(enabled: bool) -> None:
+    global PROGRESS_ENABLED
+    PROGRESS_ENABLED = enabled
+
+
+def pbar(iterable, **kwargs):
+    return tqdm(iterable, disable=not PROGRESS_ENABLED, dynamic_ncols=True, **kwargs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,6 +111,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-rows", type=int, default=0, help="0 means use all rows")
+    parser.add_argument("--show-progress", action="store_true", help="Force-enable tqdm progress bars")
+    parser.add_argument("--hide-progress", action="store_true", help="Disable tqdm progress bars")
     return parser.parse_args()
 
 
@@ -229,7 +241,7 @@ class HFPLMEmbedder:
         out_batches: List[np.ndarray] = []
         with torch.no_grad():
             steps = range(0, len(seqs), self.batch_size)
-            for i in tqdm(steps, desc="Embedding (HF PLM)", leave=False):
+            for i in pbar(steps, desc="Embedding (HF PLM)", leave=False):
                 batch = [clean_seq(s) for s in seqs[i : i + self.batch_size]]
                 toks = self.tokenizer(
                     batch,
@@ -282,7 +294,7 @@ class AntiBERTySeqEmbedder:
         out_batches: List[np.ndarray] = []
         with torch.no_grad():
             steps = range(0, len(seqs), self.batch_size)
-            for i in tqdm(steps, desc="Embedding (AntiBERTy)", leave=False):
+            for i in pbar(steps, desc="Embedding (AntiBERTy)", leave=False):
                 batch = [self._to_token_text(s) for s in seqs[i : i + self.batch_size]]
                 toks = self.tokenizer(
                     batch,
@@ -580,12 +592,12 @@ def train_torch_fusion(
     best_val = float("inf")
     bad_epochs = 0
 
-    epoch_iter = tqdm(range(args.epochs), desc="Training epochs")
+    epoch_iter = pbar(range(args.epochs), desc="Training epochs")
     for epoch_idx in epoch_iter:
         for m in model.model:
             m.train()
 
-        batch_iter = tqdm(train_loader, desc=f"Epoch {epoch_idx + 1}/{args.epochs}", leave=False)
+        batch_iter = pbar(train_loader, desc=f"Epoch {epoch_idx + 1}/{args.epochs}", leave=False)
         for hb, lb, ab, yb in batch_iter:
             hb = hb.to(model.device, non_blocking=True)
             lb = lb.to(model.device, non_blocking=True)
@@ -711,6 +723,13 @@ def choose_device(device_arg: str) -> str:
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.hide_progress:
+        set_progress_enabled(False)
+    elif args.show_progress:
+        set_progress_enabled(True)
+    else:
+        set_progress_enabled(sys.stderr.isatty() or sys.stdout.isatty())
 
     device = choose_device(args.device)
 
