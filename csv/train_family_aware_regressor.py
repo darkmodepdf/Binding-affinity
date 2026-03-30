@@ -43,6 +43,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
+from tqdm.auto import tqdm
 
 NUM_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 
@@ -227,7 +228,8 @@ class HFPLMEmbedder:
         torch = self.torch
         out_batches: List[np.ndarray] = []
         with torch.no_grad():
-            for i in range(0, len(seqs), self.batch_size):
+            steps = range(0, len(seqs), self.batch_size)
+            for i in tqdm(steps, desc="Embedding (HF PLM)", leave=False):
                 batch = [clean_seq(s) for s in seqs[i : i + self.batch_size]]
                 toks = self.tokenizer(
                     batch,
@@ -279,7 +281,8 @@ class AntiBERTySeqEmbedder:
         torch = self.torch
         out_batches: List[np.ndarray] = []
         with torch.no_grad():
-            for i in range(0, len(seqs), self.batch_size):
+            steps = range(0, len(seqs), self.batch_size)
+            for i in tqdm(steps, desc="Embedding (AntiBERTy)", leave=False):
                 batch = [self._to_token_text(s) for s in seqs[i : i + self.batch_size]]
                 toks = self.tokenizer(
                     batch,
@@ -577,11 +580,13 @@ def train_torch_fusion(
     best_val = float("inf")
     bad_epochs = 0
 
-    for _ in range(args.epochs):
+    epoch_iter = tqdm(range(args.epochs), desc="Training epochs")
+    for epoch_idx in epoch_iter:
         for m in model.model:
             m.train()
 
-        for hb, lb, ab, yb in train_loader:
+        batch_iter = tqdm(train_loader, desc=f"Epoch {epoch_idx + 1}/{args.epochs}", leave=False)
+        for hb, lb, ab, yb in batch_iter:
             hb = hb.to(model.device, non_blocking=True)
             lb = lb.to(model.device, non_blocking=True)
             ab = ab.to(model.device, non_blocking=True)
@@ -594,6 +599,7 @@ def train_torch_fusion(
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+            batch_iter.set_postfix({"loss": float(loss.detach().cpu().item())})
 
         for m in model.model:
             m.eval()
@@ -665,6 +671,33 @@ def train_sklearn_mlp(
     )
     model.fit(x_train, y_train)
     return model.predict(x_val), model.predict(x_test), model
+
+
+def print_cli_metrics(metrics: dict) -> None:
+    print("\n" + "=" * 72)
+    print("Binding Affinity Training Summary")
+    print("=" * 72)
+    print(f"Backbone: {metrics.get('backbone_mode')} | Fusion: {metrics.get('fusion_mode')} | Device: {metrics.get('device_used')}")
+    print(f"Splits -> train: {metrics.get('n_train')} | val: {metrics.get('n_val')} | test: {metrics.get('n_test')}")
+    print(f"Families -> train: {metrics.get('unique_families_train')} | val: {metrics.get('unique_families_val')} | test: {metrics.get('unique_families_test')}")
+
+    for split in ["val", "test"]:
+        block = metrics.get(split, {})
+        reg = block.get("regression", {})
+        cls = block.get("classification_like", {})
+        print(f"\n[{split.upper()}] Regression")
+        print(
+            f"  MAE={reg.get('mae', float('nan')):.4f}  RMSE={reg.get('rmse', float('nan')):.4f}  R2={reg.get('r2', float('nan')):.4f}  "
+            f"Spearman={reg.get('spearman', float('nan')):.4f}  Pearson={reg.get('pearson', float('nan')):.4f}"
+        )
+        print(f"[{split.upper()}] Classification-like")
+        print(
+            f"  ROC-AUC={cls.get('roc_auc', float('nan')):.4f}  PR-AUC={cls.get('pr_auc', float('nan')):.4f}  "
+            f"Accuracy={cls.get('accuracy', float('nan')):.4f}  Precision={cls.get('precision', float('nan')):.4f}  "
+            f"Recall={cls.get('recall', float('nan')):.4f}  F1={cls.get('f1', float('nan')):.4f}"
+        )
+
+    print("=" * 72)
 
 
 def choose_device(device_arg: str) -> str:
@@ -810,7 +843,7 @@ def main() -> None:
     with (args.output_dir / "run_config.json").open("w", encoding="utf-8") as f:
         json.dump(vars(args), f, indent=2, default=str)
 
-    print(json.dumps(metrics, indent=2))
+    print_cli_metrics(metrics)
 
 
 if __name__ == "__main__":
