@@ -1,0 +1,33 @@
+name: binding-affinity
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - pyarrow
+  - joblib
+  - tqdm
+  - pytorch>=2.1
+  - pytorch-cuda=12.1
+  - pip:
+      - transformers>=4.40
+      - tokenizers
+      - safetensors
+      - huggingface-hub
+      - sentencepiece
+      - biopython
+      - delta-spark<4.0
+      - findspark
+      - gdown
+      - json2schema
+      - oauth2client
+      - py4j
+      - pydrive2
+      - pyspark<4.0

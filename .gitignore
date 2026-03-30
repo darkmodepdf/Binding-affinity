@@ -1,5 +1,7 @@
 # Python env/cache
 .venv/
+venv/
+env/
 __pycache__/
 *.pyc
 *.pyo
@@ -11,19 +13,40 @@ __pycache__/
 # OS/editor
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
 
-# Large raw/processed datasets
+# Raw/processed datasets and archives
 asd/
+compressed_for_github/
+_tmp_rebuild_zips/
 csv/asd_full.csv
 csv/asd_regression_ready_hla.csv
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.part0*
 
-# Model outputs/artifacts
+# Model outputs/artifacts/cache
 csv/model_artifacts*/
+csv/embedding_cache/
 csv/*_split.csv
 csv/*metrics*.json
+csv/*run_config*.json
 *.joblib
+*.pt
+*.bin
 
-# Optional temp/log files
+# Local model weights/checkpoints (keep code, ignore heavy assets)
+models/**/__pycache__/
+models/**/*.pyc
+models/**/.idea/
+models/**/trained_models/
+models/**/checkpoints/
+models/**/vanilla_model_weights/
+
+# Logs/temp
 *.log
 tmp/
 temp/
