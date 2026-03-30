@@ -18,7 +18,7 @@ dependencies:
   - pytorch-cuda=12.1
   - pip:
       - transformers==4.57.1
-      - tokenizers==0.21.2
+      - tokenizers==0.22.1
       - safetensors
       - huggingface-hub<1.0
       - sentencepiece

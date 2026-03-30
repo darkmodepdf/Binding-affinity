@@ -6,7 +6,7 @@ scipy
 scikit-learn
 torch
 transformers==4.57.1
-tokenizers==0.21.2
+tokenizers==0.22.1
 huggingface-hub<1.0
 safetensors
 sentencepiece
